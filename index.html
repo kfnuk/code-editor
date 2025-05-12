@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Code Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/material-darker.min.css">
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='50' height='100' fill='%231a202c'/%3E%3C!-- Dark Gray Left --%3E%3Crect x='50' width='50' height='100' fill='%23ffffff'/%3E%3C!-- White Right --%3E%3Ctext x='50' y='65' font-size='50' font-family='monospace' fill='%23a0aec0' text-anchor='middle'%3E%26lt;/%26gt;%3C/text%3E%3C!-- Light Gray Code Brackets --%3E%3C/svg%3E" type="image/svg+xml">
+
+    <style>
+        /* Ensure CodeMirror instances fill their container using flexbox */
+        .CodeMirror {
+            font-size: 14px;
+            line-height: 1.4;
+            flex-grow: 1; /* Allow editor to fill vertical space */
+            position: relative; /* Needed for some CodeMirror elements */
+            min-height: 100px;
+            z-index: 1;
+        }
+
+        /* Style the container holding the CodeMirror editor */
+        .editor-codemirror-container {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Ensure iframe takes full height in its container */
+        .preview-pane iframe {
+             height: 100%;
+             width: 100%;
+             border: none;
+        }
+
+        /* Ensure editor panes fill the height of the editor row */
+        .editor-pane {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Ensure label doesn't shrink */
+        .editor-pane label {
+            flex-shrink: 0;
+        }
+
+        /* Container for the preview iframe */
+        .preview-iframe-container {
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+         /* REMOVED: textarea { display: none; } - Will be hidden via JS */
+
+    </style>
+</head>
+<body class="bg-gray-100 font-sans flex flex-col h-screen overflow-hidden">
+
+    <header class="bg-gray-900 text-white p-3 shadow-md flex-shrink-0">
+        <h1 class="text-xl font-semibold text-center">Code Editor + Preview</h1>
+    </header>
+
+    <div class="flex-grow flex flex-col overflow-hidden">
+
+        <div class="h-1/2 flex flex-row bg-gray-800 border-b-4 border-gray-600 overflow-hidden">
+
+            <div class="editor-pane flex-1 border-r border-gray-700 min-w-0">
+                <label class="bg-gray-700 p-2 font-medium text-sm text-gray-200">HTML</label>
+                <div class="editor-codemirror-container">
+                    <textarea id="html-code"><div class="p-4">
+  <h1 class="text-2xl font-bold text-blue-400">Hello World!</h1>
+  <p class="mt-2 text-gray-300">Edit the code to see live updates below.</p>
+  <button id="myButton" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">Click Me</button>
+  <p id="message" class="mt-2 text-sm text-green-400"></p>
+</div></textarea>
+                </div>
+            </div>
+
+            <div class="editor-pane flex-1 border-r border-gray-700 min-w-0">
+                <label class="bg-gray-700 p-2 font-medium text-sm text-gray-200">CSS</label>
+                 <div class="editor-codemirror-container">
+                     <textarea id="css-code">/* Default CSS - Tailwind classes also work in HTML */
+body {
+  font-family: sans-serif;
+  margin: 0;
+  padding: 10px;
+  background-color: #ffffff;
+  color: #333333;
+}
+
+#myButton {
+  transition: background-color 0.3s ease;
+}
+
+h1 {
+    color: #2563eb; /* Blue-600 */
+}
+</textarea>
+                </div>
+            </div>
+
+            <div class="editor-pane flex-1 min-w-0">
+                <label class="bg-gray-700 p-2 font-medium text-sm text-gray-200">JavaScript</label>
+                 <div class="editor-codemirror-container">
+                     <textarea id="js-code">// Default JavaScript
+const button = document.getElementById('myButton');
+const message = document.getElementById('message');
+
+if (button && message) {
+  button.addEventListener('click', () => {
+    message.textContent = 'Button clicked at ' + new Date().toLocaleTimeString();
+    // Clear message after 3 seconds
+    setTimeout(() => {
+      message.textContent = '';
+    }, 3000);
+  });
+} else {
+  console.error("Error: Button or message element not found.");
+}
+</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="h-1/2 flex flex-col preview-pane bg-white">
+             <label class="bg-gray-200 p-2 font-medium text-sm text-gray-700 border-b border-gray-300 flex-shrink-0">Preview</label>
+             <div class="preview-iframe-container">
+                <iframe id="preview-pane" title="Live Preview"></iframe>
+             </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closetag.min.js"></script>
+
+    <script>
+        let htmlEditor, cssEditor, jsEditor; // To hold CodeMirror instances
+        const previewPane = document.getElementById('preview-pane');
+        let debounceTimer;
+
+        // Function to initialize CodeMirror editors
+        function initializeEditors() {
+            const commonConfig = {
+                lineNumbers: true,
+                theme: "material-darker",
+                lineWrapping: true,
+                autoCloseTags: true,
+            };
+
+            try {
+                const htmlTextarea = document.getElementById('html-code');
+                htmlEditor = CodeMirror.fromTextArea(htmlTextarea, {
+                    ...commonConfig, mode: 'xml', htmlMode: true
+                });
+                htmlTextarea.style.display = 'none'; // Hide textarea after init
+
+                const cssTextarea = document.getElementById('css-code');
+                cssEditor = CodeMirror.fromTextArea(cssTextarea, {
+                    ...commonConfig, mode: 'css'
+                });
+                cssTextarea.style.display = 'none'; // Hide textarea after init
+
+                const jsTextarea = document.getElementById('js-code');
+                jsEditor = CodeMirror.fromTextArea(jsTextarea, {
+                    ...commonConfig, mode: 'javascript'
+                });
+                jsTextarea.style.display = 'none'; // Hide textarea after init
+
+                // Attach change listeners
+                htmlEditor.on('change', debouncedUpdate);
+                cssEditor.on('change', debouncedUpdate);
+                jsEditor.on('change', debouncedUpdate);
+
+                 // Refresh editors and run initial update
+                 setTimeout(() => {
+                    try {
+                        htmlEditor.refresh();
+                        cssEditor.refresh();
+                        jsEditor.refresh();
+                        updatePreview();
+                    } catch(refreshError) {
+                        console.error("Error during editor refresh or initial update:", refreshError);
+                    }
+                 }, 300);
+
+            } catch (initError) {
+                 console.error("Failed to initialize CodeMirror editors:", initError);
+                 alert("Error initializing code editors. Fallback textareas might be visible. Check console.");
+                 // Make sure textareas are visible if CodeMirror failed
+                 document.getElementById('html-code').style.display = 'block';
+                 document.getElementById('css-code').style.display = 'block';
+                 document.getElementById('js-code').style.display = 'block';
+            }
+        }
+
+        // Debounced update function
+        function debouncedUpdate() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(updatePreview, 300);
+        }
+
+        // Function to update the preview pane with centralized error handling
+        function updatePreview() {
+            if (!htmlEditor || !cssEditor || !jsEditor) {
+                console.warn("updatePreview called before editors were fully initialized.");
+                return;
+            }
+
+            let previewDoc; // Declare previewDoc outside try block
+
+            try {
+                previewDoc = previewPane.contentWindow.document;
+                if (!previewDoc) {
+                    console.error("Preview document not accessible. Cannot update.");
+                    // Optionally, try again after a delay, but avoid infinite loops
+                    // setTimeout(updatePreview, 500);
+                    return;
+                }
+
+                const htmlContent = htmlEditor.getValue();
+                const cssContent = cssEditor.getValue();
+                const jsContent = jsEditor.getValue();
+
+                // FIX: Start template literal immediately, no leading whitespace
+                // FIX: Added html, body height style
+                const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>
+        /* Ensure html/body fill iframe */
+        html, body { height: 100%; margin: 0; padding: 0; overflow: auto; }
+
+        /* User's CSS */
+        ${cssContent}
+
+        /* Basic error styling */
+        .preview-error {
+            background-color: #fff0f0; color: #c53030; border: 1px solid #f56565;
+            padding: 10px; margin: 10px; border-radius: 4px;
+            font-family: monospace; white-space: pre-wrap; font-size: 0.9em;
+            position: relative; z-index: 9999;
+        }
+    </style>
+    <title>Preview</title>
+</head>
+<body class="bg-white">
+    ${htmlContent}
+    <script>
+        // Clear previous errors if any (within the script block itself)
+        const existingError = document.querySelector('.preview-error');
+        if (existingError) existingError.remove();
+
+        // Execute user's JS in a try-catch block
+        try {
+            (function() { ${jsContent} })(); // IIFE to scope the user's code
+        } catch (error) {
+            console.error("JavaScript Error in Preview:", error);
+            // Error handling moved outside this script block to the main catch
+            // We'll re-throw to be caught by the outer catch block
+            throw error;
+        }
+    <\/script>
+</body>
+</html>`;
+
+                // Write the content to the iframe
+                previewDoc.open();
+                previewDoc.write(fullHtml);
+                previewDoc.close();
+
+            } catch (e) {
+                // Centralized error handling for preview update issues
+                console.error("Error updating preview:", e);
+
+                // Attempt to display error inside the preview iframe if possible
+                if (previewDoc && previewDoc.body) {
+                    try {
+                        // FIX: Create error element on the preview document
+                        const errorDiv = previewDoc.createElement('div');
+                        errorDiv.className = 'preview-error'; // Use the defined style
+                        errorDiv.textContent = `Preview Update/Runtime Error:\n${e.message}`;
+                        if (e.stack) {
+                             errorDiv.textContent += '\n' + e.stack.split('\n').slice(0, 5).join('\n'); // Limited stack trace
+                        }
+                         // Clear previous errors before adding new one
+                        const existingError = previewDoc.querySelector('.preview-error');
+                        if (existingError) existingError.remove();
+
+                        previewDoc.body.prepend(errorDiv); // Prepend error for visibility
+                    } catch (displayError) {
+                        console.error("Could not display error in preview pane:", displayError);
+                    }
+                } else {
+                    console.error("Cannot display error in preview pane because preview document or body is not available.");
+                }
+            }
+        }
+
+        // Initialize editors after the page loads
+        window.addEventListener('load', initializeEditors);
+
+    </script>
+
+</body>
+</html>
