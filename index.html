@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Code Editor</title>
+    <title>Live Code Editor with Draggable Splitters</title>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
@@ -12,52 +12,101 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='50' height='100' fill='%231a202c'/%3E%3C!-- Dark Gray Left --%3E%3Crect x='50' width='50' height='100' fill='%23ffffff'/%3E%3C!-- White Right --%3E%3Ctext x='50' y='65' font-size='50' font-family='monospace' fill='%23a0aec0' text-anchor='middle'%3E%26lt;/%26gt;%3C/text%3E%3C!-- Light Gray Code Brackets --%3E%3C/svg%3E" type="image/svg+xml">
 
     <style>
-        /* Ensure CodeMirror instances fill their container using flexbox */
+        /* Prevent text selection during drag */
+        body.dragging, body.dragging * {
+            cursor: grabbing !important; /* Indicate dragging */
+            user-select: none; /* Prevent text selection */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        /* Splitter Styles */
+        .splitter-horizontal {
+            height: 6px; /* Make it easier to grab */
+            background-color: #4a5568; /* gray-700 */
+            cursor: ns-resize; /* North-South resize cursor */
+            flex-shrink: 0; /* Prevent splitter from shrinking */
+            z-index: 10; /* Ensure it's above panes */
+            position: relative;
+        }
+        .splitter-vertical {
+            width: 6px; /* Make it easier to grab */
+            background-color: #4a5568; /* gray-700 */
+            cursor: ew-resize; /* East-West resize cursor */
+            flex-shrink: 0; /* Prevent splitter from shrinking */
+            z-index: 10;
+            position: relative;
+        }
+        .splitter-horizontal:hover, .splitter-vertical:hover {
+             background-color: #718096; /* gray-500 */
+        }
+
+
+        /* CodeMirror Styles */
         .CodeMirror {
             font-size: 14px;
             line-height: 1.4;
-            flex-grow: 1; /* Allow editor to fill vertical space */
-            position: relative; /* Needed for some CodeMirror elements */
-            min-height: 100px;
+            flex-grow: 1;
+            position: relative;
+            min-height: 50px; /* Minimum height for editor */
             z-index: 1;
+            height: 100%; /* Crucial for CodeMirror to fill container */
         }
-
-        /* Style the container holding the CodeMirror editor */
         .editor-codemirror-container {
             display: flex;
             flex-direction: column;
             flex-grow: 1;
             overflow: hidden;
             position: relative;
+            min-height: 0; /* Allow shrinking */
         }
 
-        /* Ensure iframe takes full height in its container */
+        /* Iframe Styles */
         .preview-pane iframe {
              height: 100%;
              width: 100%;
              border: none;
         }
 
-        /* Ensure editor panes fill the height of the editor row */
+        /* Pane Styles */
         .editor-pane {
             display: flex;
             flex-direction: column;
-            height: 100%;
+            /* height: 100%; REMOVED - Flex basis will control */
             overflow: hidden;
+            position: relative; /* Needed for absolute positioning if required later */
+            min-width: 50px; /* Minimum width for editor panes */
+            min-height: 70px; /* Minimum height for editor panes (label+toolbar+min editor) */
         }
-
-        /* Ensure label doesn't shrink */
-        .editor-pane label {
+        .editor-pane label, .editor-pane .toolbar {
             flex-shrink: 0;
         }
+        .preview-pane {
+             min-height: 50px; /* Minimum height for preview */
+        }
 
-        /* Container for the preview iframe */
+        /* Toolbar Styles */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .toolbar button {
+            padding: 4px 8px; margin: 2px; border-radius: 4px;
+            background-color: #4a5568; color: #e2e8f0; border: 1px solid #718096;
+            font-size: 12px; cursor: pointer; transition: background-color 0.2s;
+            line-height: 1;
+        }
+        .toolbar button:hover { background-color: #718096; }
+        .toolbar button:active { background-color: #2d3748; }
+        .toolbar button i { font-style: normal; }
+
+        /* Preview Iframe Container */
         .preview-iframe-container {
             flex-grow: 1;
             overflow: hidden;
+            min-height: 0; /* Allow shrinking */
         }
-
-         /* REMOVED: textarea { display: none; } - Will be hidden via JS */
 
     </style>
 </head>
@@ -67,12 +116,28 @@
         <h1 class="text-xl font-semibold text-center">Code Editor + Preview</h1>
     </header>
 
-    <div class="flex-grow flex flex-col overflow-hidden">
+    <div id="main-container" class="flex-grow flex flex-col overflow-hidden">
 
-        <div class="h-1/2 flex flex-row bg-gray-800 border-b-4 border-gray-600 overflow-hidden">
-
-            <div class="editor-pane flex-1 border-r border-gray-700 min-w-0">
+        <div id="editor-row" class="flex flex-row bg-gray-800 overflow-hidden" style="flex-basis: 50%;"> <div id="html-pane" class="editor-pane flex-1 border-r border-gray-700 min-w-0" style="flex-basis: 33.33%;">
                 <label class="bg-gray-700 p-2 font-medium text-sm text-gray-200">HTML</label>
+                <div class="toolbar bg-gray-600 p-1 border-b border-gray-700">
+                    <button id="btn-bold" title="Bold (Ctrl+B)"><b>B</b></button>
+                    <button id="btn-italic" title="Italic (Ctrl+I)"><i>I</i></button>
+                    <button id="btn-underline" title="Underline (Ctrl+U)"><u>U</u></button>
+                    <button id="btn-strikethrough" title="Strikethrough"><s>S</s></button>
+                    <button id="btn-h1" title="Heading 1">H1</button>
+                    <button id="btn-h2" title="Heading 2">H2</button>
+                    <button id="btn-h3" title="Heading 3">H3</button>
+                    <button id="btn-p" title="Paragraph">P</button>
+                    <button id="btn-blockquote" title="Blockquote">"</button>
+                    <button id="btn-ol" title="Ordered List">1.</button>
+                    <button id="btn-ul" title="Unordered List">•</button>
+                    <button id="btn-link" title="Insert Link">Link</button>
+                    <button id="btn-image" title="Insert Image">Img</button>
+                    <button id="btn-code" title="Inline Code">`Code`</button>
+                    <button id="btn-pre" title="Preformatted Text">[Pre]</button>
+                    <button id="btn-hr" title="Horizontal Rule">---</button>
+                </div>
                 <div class="editor-codemirror-container">
                     <textarea id="html-code"><div class="p-4">
   <h1 class="text-2xl font-bold text-blue-400">Hello World!</h1>
@@ -83,54 +148,28 @@
                 </div>
             </div>
 
-            <div class="editor-pane flex-1 border-r border-gray-700 min-w-0">
+            <div id="v-splitter-1" class="splitter-vertical"></div>
+
+            <div id="css-pane" class="editor-pane flex-1 border-r border-gray-700 min-w-0" style="flex-basis: 33.33%;">
                 <label class="bg-gray-700 p-2 font-medium text-sm text-gray-200">CSS</label>
                  <div class="editor-codemirror-container">
-                     <textarea id="css-code">/* Default CSS - Tailwind classes also work in HTML */
-body {
-  font-family: sans-serif;
-  margin: 0;
-  padding: 10px;
-  background-color: #ffffff;
-  color: #333333;
-}
-
-#myButton {
-  transition: background-color 0.3s ease;
-}
-
-h1 {
-    color: #2563eb; /* Blue-600 */
-}
-</textarea>
+                    <textarea id="css-code">/* Default CSS */ body { font-family: sans-serif; margin: 0; padding: 10px; background-color: #ffffff; color: #333333; } #myButton { transition: background-color 0.3s ease; } h1 { color: #2563eb; }</textarea>
                 </div>
             </div>
 
-            <div class="editor-pane flex-1 min-w-0">
+            <div id="v-splitter-2" class="splitter-vertical"></div>
+
+            <div id="js-pane" class="editor-pane flex-1 min-w-0" style="flex-basis: 33.33%;">
                 <label class="bg-gray-700 p-2 font-medium text-sm text-gray-200">JavaScript</label>
                  <div class="editor-codemirror-container">
-                     <textarea id="js-code">// Default JavaScript
-const button = document.getElementById('myButton');
-const message = document.getElementById('message');
-
-if (button && message) {
-  button.addEventListener('click', () => {
-    message.textContent = 'Button clicked at ' + new Date().toLocaleTimeString();
-    // Clear message after 3 seconds
-    setTimeout(() => {
-      message.textContent = '';
-    }, 3000);
-  });
-} else {
-  console.error("Error: Button or message element not found.");
-}
-</textarea>
+                    <textarea id="js-code">// Default JS\nconst btn = document.getElementById('myButton');\nconst msg = document.getElementById('message');\nif(btn&&msg){btn.onclick=()=>{msg.textContent='Clicked: '+new Date().toLocaleTimeString();setTimeout(()=>msg.textContent='',3000)}}else{console.error('Btn/Msg not found')}</textarea>
                 </div>
             </div>
         </div>
 
-        <div class="h-1/2 flex flex-col preview-pane bg-white">
-             <label class="bg-gray-200 p-2 font-medium text-sm text-gray-700 border-b border-gray-300 flex-shrink-0">Preview</label>
+        <div id="h-splitter" class="splitter-horizontal"></div>
+
+        <div id="preview-row" class="flex flex-col preview-pane bg-white" style="flex-basis: 50%;"> <label class="bg-gray-200 p-2 font-medium text-sm text-gray-700 border-b border-gray-300 flex-shrink-0">Preview</label>
              <div class="preview-iframe-container">
                 <iframe id="preview-pane" title="Live Preview"></iframe>
              </div>
@@ -143,175 +182,183 @@ if (button && message) {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/css/css.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closetag.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/selection/active-line.min.js"></script>
+
 
     <script>
-        let htmlEditor, cssEditor, jsEditor; // To hold CodeMirror instances
+        let htmlEditor, cssEditor, jsEditor;
         const previewPane = document.getElementById('preview-pane');
         let debounceTimer;
 
-        // Function to initialize CodeMirror editors
+        // --- Toolbar Functions (remain the same) ---
+        function wrapOrInsertTag(tag, isBlock = false, attributes = '') { /* ... as before ... */
+            if (!htmlEditor) return;
+            const selection = htmlEditor.getSelection();
+            const cursor = htmlEditor.getCursor();
+            const line = htmlEditor.getLine(cursor.line);
+            let openTag = `<${tag}${attributes ? ' ' + attributes : ''}>`;
+            let closeTag = `</${tag}>`;
+            if (selection) { htmlEditor.replaceSelection(`${openTag}${selection}${closeTag}`); }
+            else if (isBlock && line.trim() !== '') { htmlEditor.setLine(cursor.line, `${openTag}${line}${closeTag}`); }
+            else { htmlEditor.replaceRange(`${openTag}${closeTag}`, cursor); htmlEditor.setCursor({ line: cursor.line, ch: cursor.ch + openTag.length }); }
+            htmlEditor.focus(); updatePreview();
+        }
+        function applyInlineTag(tag) { wrapOrInsertTag(tag, false); }
+        function applyBlockTag(tag) { wrapOrInsertTag(tag, true); }
+        function insertList(listType) { /* ... as before ... */
+            if (!htmlEditor) return; const sel = htmlEditor.listSelections()[0]; const start = sel.anchor.line; const end = sel.head.line; let content = '';
+            for (let i = Math.min(start, end); i <= Math.max(start, end); i++) { const line = htmlEditor.getLine(i).trim(); if (line || i === start) { content += `\n  <li>${line}</li>`; } }
+            if (content) { const tag = `<${listType}>${content}\n</${listType}>\n`; if (start !== end || htmlEditor.getLine(start).trim() !== '') { htmlEditor.replaceRange(tag, { line: Math.min(start, end), ch: 0 }, { line: Math.max(start, end), ch: htmlEditor.getLine(Math.max(start, end)).length }); } else { htmlEditor.replaceRange(tag, htmlEditor.getCursor()); } }
+            else { const cursor = htmlEditor.getCursor(); htmlEditor.replaceRange(`<${listType}>\n  <li></li>\n</${listType}>\n`, cursor); htmlEditor.setCursor({ line: cursor.line + 1, ch: 4 }); }
+            htmlEditor.focus(); updatePreview();
+         }
+        function insertLink() { /* ... as before ... */ if (!htmlEditor) return; const url = prompt("Enter link URL:", "https://"); if (url) { wrapOrInsertTag('a', false, `href="${url}"`); } }
+        function insertImage() { /* ... as before ... */ if (!htmlEditor) return; const src = prompt("Enter image URL:", "https://"); if (src) { const alt = prompt("Alt text:", ""); const tag = `<img src="${src}" alt="${alt || 'Image'}" style="max-width: 100%; height: auto;">\n`; htmlEditor.replaceRange(tag, htmlEditor.getCursor()); htmlEditor.focus(); updatePreview(); } }
+        function insertHorizontalRule() { /* ... as before ... */ if (!htmlEditor) return; htmlEditor.replaceRange('<hr>\n', htmlEditor.getCursor()); htmlEditor.focus(); updatePreview(); }
+
+        // --- Editor Initialization ---
         function initializeEditors() {
-            const commonConfig = {
-                lineNumbers: true,
-                theme: "material-darker",
-                lineWrapping: true,
-                autoCloseTags: true,
-            };
+             const commonConfig = { /* ... as before ... */
+                lineNumbers: true, theme: "material-darker", lineWrapping: true, autoCloseTags: true, styleActiveLine: true,
+                extraKeys: { "Ctrl-B": (cm)=>applyInlineTag('strong'), "Cmd-B": (cm)=>applyInlineTag('strong'), "Ctrl-I": (cm)=>applyInlineTag('em'), "Cmd-I": (cm)=>applyInlineTag('em'), "Ctrl-U": (cm)=>applyInlineTag('u'), "Cmd-U": (cm)=>applyInlineTag('u') }
+             };
+             try {
+                const htmlTA = document.getElementById('html-code'); htmlEditor = CodeMirror.fromTextArea(htmlTA, {...commonConfig, mode: 'xml', htmlMode: true}); htmlTA.style.display = 'none';
+                const cssTA = document.getElementById('css-code'); cssEditor = CodeMirror.fromTextArea(cssTA, {...commonConfig, mode: 'css'}); cssTA.style.display = 'none';
+                const jsTA = document.getElementById('js-code'); jsEditor = CodeMirror.fromTextArea(jsTA, {...commonConfig, mode: 'javascript'}); jsTA.style.display = 'none';
 
-            try {
-                const htmlTextarea = document.getElementById('html-code');
-                htmlEditor = CodeMirror.fromTextArea(htmlTextarea, {
-                    ...commonConfig, mode: 'xml', htmlMode: true
-                });
-                htmlTextarea.style.display = 'none'; // Hide textarea after init
-
-                const cssTextarea = document.getElementById('css-code');
-                cssEditor = CodeMirror.fromTextArea(cssTextarea, {
-                    ...commonConfig, mode: 'css'
-                });
-                cssTextarea.style.display = 'none'; // Hide textarea after init
-
-                const jsTextarea = document.getElementById('js-code');
-                jsEditor = CodeMirror.fromTextArea(jsTextarea, {
-                    ...commonConfig, mode: 'javascript'
-                });
-                jsTextarea.style.display = 'none'; // Hide textarea after init
+                // Attach Toolbar Listeners
+                document.getElementById('btn-bold').onclick = () => applyInlineTag('strong'); document.getElementById('btn-italic').onclick = () => applyInlineTag('em');
+                document.getElementById('btn-underline').onclick = () => applyInlineTag('u'); document.getElementById('btn-strikethrough').onclick = () => applyInlineTag('del');
+                document.getElementById('btn-h1').onclick = () => applyBlockTag('h1'); document.getElementById('btn-h2').onclick = () => applyBlockTag('h2'); document.getElementById('btn-h3').onclick = () => applyBlockTag('h3');
+                document.getElementById('btn-p').onclick = () => applyBlockTag('p'); document.getElementById('btn-blockquote').onclick = () => applyBlockTag('blockquote');
+                document.getElementById('btn-ol').onclick = () => insertList('ol'); document.getElementById('btn-ul').onclick = () => insertList('ul');
+                document.getElementById('btn-link').onclick = insertLink; document.getElementById('btn-image').onclick = insertImage;
+                document.getElementById('btn-code').onclick = () => applyInlineTag('code'); document.getElementById('btn-pre').onclick = () => applyBlockTag('pre'); document.getElementById('btn-hr').onclick = insertHorizontalRule;
 
                 // Attach change listeners
-                htmlEditor.on('change', debouncedUpdate);
-                cssEditor.on('change', debouncedUpdate);
-                jsEditor.on('change', debouncedUpdate);
+                htmlEditor.on('change', debouncedUpdate); cssEditor.on('change', debouncedUpdate); jsEditor.on('change', debouncedUpdate);
 
-                 // Refresh editors and run initial update
-                 setTimeout(() => {
-                    try {
-                        htmlEditor.refresh();
-                        cssEditor.refresh();
-                        jsEditor.refresh();
-                        updatePreview();
-                    } catch(refreshError) {
-                        console.error("Error during editor refresh or initial update:", refreshError);
-                    }
-                 }, 300);
+                // Initial Refresh & Update
+                 setTimeout(() => { try { htmlEditor.refresh(); cssEditor.refresh(); jsEditor.refresh(); updatePreview(); } catch(e){ console.error("Refresh Error:", e); } }, 300);
 
-            } catch (initError) {
-                 console.error("Failed to initialize CodeMirror editors:", initError);
-                 alert("Error initializing code editors. Fallback textareas might be visible. Check console.");
-                 // Make sure textareas are visible if CodeMirror failed
-                 document.getElementById('html-code').style.display = 'block';
-                 document.getElementById('css-code').style.display = 'block';
-                 document.getElementById('js-code').style.display = 'block';
-            }
+             } catch (e) { console.error("Init Error:", e); alert("Editor init failed!"); /* Show fallbacks */ }
         }
 
-        // Debounced update function
-        function debouncedUpdate() {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(updatePreview, 300);
-        }
+        // --- Debounced Preview Update ---
+        function debouncedUpdate() { clearTimeout(debounceTimer); debounceTimer = setTimeout(updatePreview, 300); }
 
-        // Function to update the preview pane with centralized error handling
-        function updatePreview() {
-            if (!htmlEditor || !cssEditor || !jsEditor) {
-                console.warn("updatePreview called before editors were fully initialized.");
-                return;
-            }
-
-            let previewDoc; // Declare previewDoc outside try block
-
+        // --- Update Preview Function ---
+        function updatePreview() { /* ... largely the same as before ... */
+            if (!htmlEditor || !cssEditor || !jsEditor) { return; } let previewDoc;
             try {
-                previewDoc = previewPane.contentWindow.document;
-                if (!previewDoc) {
-                    console.error("Preview document not accessible. Cannot update.");
-                    // Optionally, try again after a delay, but avoid infinite loops
-                    // setTimeout(updatePreview, 500);
-                    return;
-                }
-
-                const htmlContent = htmlEditor.getValue();
-                const cssContent = cssEditor.getValue();
-                const jsContent = jsEditor.getValue();
-
-                // FIX: Start template literal immediately, no leading whitespace
-                // FIX: Added html, body height style
-                const fullHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"><\/script>
-    <style>
-        /* Ensure html/body fill iframe */
-        html, body { height: 100%; margin: 0; padding: 0; overflow: auto; }
-
-        /* User's CSS */
-        ${cssContent}
-
-        /* Basic error styling */
-        .preview-error {
-            background-color: #fff0f0; color: #c53030; border: 1px solid #f56565;
-            padding: 10px; margin: 10px; border-radius: 4px;
-            font-family: monospace; white-space: pre-wrap; font-size: 0.9em;
-            position: relative; z-index: 9999;
-        }
-    </style>
-    <title>Preview</title>
-</head>
-<body class="bg-white">
-    ${htmlContent}
-    <script>
-        // Clear previous errors if any (within the script block itself)
-        const existingError = document.querySelector('.preview-error');
-        if (existingError) existingError.remove();
-
-        // Execute user's JS in a try-catch block
-        try {
-            (function() { ${jsContent} })(); // IIFE to scope the user's code
-        } catch (error) {
-            console.error("JavaScript Error in Preview:", error);
-            // Error handling moved outside this script block to the main catch
-            // We'll re-throw to be caught by the outer catch block
-            throw error;
-        }
-    <\/script>
-</body>
-</html>`;
-
-                // Write the content to the iframe
-                previewDoc.open();
-                previewDoc.write(fullHtml);
-                previewDoc.close();
-
+                previewDoc = previewPane.contentWindow.document; if (!previewDoc) { console.error("Preview doc missing"); return; }
+                const html = htmlEditor.getValue(); const css = cssEditor.getValue(); const js = jsEditor.getValue();
+                const fullHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"><\/script><style>html, body { height: 100%; margin: 0; padding: 0; overflow: auto; } ${css} .preview-error { background-color: #fff0f0; color: #c53030; border: 1px solid #f56565; padding: 10px; margin: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; font-size: 0.9em; position: relative; z-index: 9999; } blockquote { border-left: 4px solid #ccc; margin-left: 0; padding-left: 1rem; color: #555; } pre { background-color: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; } code { font-family: monospace; background-color: #eee; padding: 2px 4px; border-radius: 3px; } pre code { background-color: transparent; padding: 0; border-radius: 0; }<\/style><title>Preview</title></head><body class="bg-white">${html}<script>const err = document.querySelector('.preview-error'); if(err) err.remove(); try { (function() { ${js} })(); } catch (e) { console.error("JS Error:", e); throw e; }<\/script></body></html>`;
+                previewDoc.open(); previewDoc.write(fullHtml); previewDoc.close();
             } catch (e) {
-                // Centralized error handling for preview update issues
-                console.error("Error updating preview:", e);
-
-                // Attempt to display error inside the preview iframe if possible
-                if (previewDoc && previewDoc.body) {
-                    try {
-                        // FIX: Create error element on the preview document
-                        const errorDiv = previewDoc.createElement('div');
-                        errorDiv.className = 'preview-error'; // Use the defined style
-                        errorDiv.textContent = `Preview Update/Runtime Error:\n${e.message}`;
-                        if (e.stack) {
-                             errorDiv.textContent += '\n' + e.stack.split('\n').slice(0, 5).join('\n'); // Limited stack trace
-                        }
-                         // Clear previous errors before adding new one
-                        const existingError = previewDoc.querySelector('.preview-error');
-                        if (existingError) existingError.remove();
-
-                        previewDoc.body.prepend(errorDiv); // Prepend error for visibility
-                    } catch (displayError) {
-                        console.error("Could not display error in preview pane:", displayError);
-                    }
-                } else {
-                    console.error("Cannot display error in preview pane because preview document or body is not available.");
-                }
+                console.error("Preview Update Error:", e);
+                if (previewDoc && previewDoc.body) { try { const d = previewDoc.createElement('div'); d.className = 'preview-error'; d.textContent = `Error: ${e.message}`; if (e.stack) { d.textContent += '\n' + e.stack.split('\n').slice(0, 5).join('\n'); } const ex = previewDoc.querySelector('.preview-error'); if (ex) ex.remove(); previewDoc.body.prepend(d); } catch (de) { console.error("Err display err:", de); } } else { console.error("Cannot display err in preview."); }
             }
         }
 
-        // Initialize editors after the page loads
-        window.addEventListener('load', initializeEditors);
+        // --- Splitter Logic ---
+        function makeDraggable(splitterId, affectedElements, direction) {
+            const splitter = document.getElementById(splitterId);
+            if (!splitter) return;
+
+            let mouseDownInfo;
+
+            splitter.addEventListener('mousedown', (e) => {
+                mouseDownInfo = {
+                    e,
+                    offsetLeft: splitter.offsetLeft,
+                    offsetTop: splitter.offsetTop,
+                    firstElement: affectedElements.first,
+                    secondElement: affectedElements.second,
+                    firstElementInitialSize: (direction === 'horizontal') ? affectedElements.first.offsetHeight : affectedElements.first.offsetWidth,
+                    secondElementInitialSize: (direction === 'horizontal') ? affectedElements.second.offsetHeight : affectedElements.second.offsetWidth
+                };
+                document.body.classList.add('dragging'); // Add class for cursor and selection prevention
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+            });
+
+            function handleMouseMove(e) {
+                if (!mouseDownInfo) return;
+
+                const container = (direction === 'horizontal') ? document.getElementById('main-container') : document.getElementById('editor-row');
+                const containerSize = (direction === 'horizontal') ? container.offsetHeight : container.offsetWidth;
+                const splitterSize = (direction === 'horizontal') ? splitter.offsetHeight : splitter.offsetWidth;
+
+                // Calculate delta
+                let delta = (direction === 'horizontal') ? e.clientY - mouseDownInfo.e.clientY : e.clientX - mouseDownInfo.e.clientX;
+
+                // Calculate new sizes in pixels
+                let firstElementNewSize = mouseDownInfo.firstElementInitialSize + delta;
+                let secondElementNewSize = mouseDownInfo.secondElementInitialSize - delta;
+
+                // Enforce minimum sizes (e.g., 50px)
+                const minSize = 50;
+                if (firstElementNewSize < minSize) {
+                    firstElementNewSize = minSize;
+                    secondElementNewSize = containerSize - minSize - splitterSize;
+                    delta = firstElementNewSize - mouseDownInfo.firstElementInitialSize; // Recalculate delta based on constraint
+                } else if (secondElementNewSize < minSize) {
+                    secondElementNewSize = minSize;
+                    firstElementNewSize = containerSize - minSize - splitterSize;
+                    delta = firstElementNewSize - mouseDownInfo.firstElementInitialSize; // Recalculate delta based on constraint
+                }
+
+
+                 // Convert pixel sizes to percentages for flex-basis
+                 const firstBasis = (firstElementNewSize / containerSize) * 100;
+                 const secondBasis = (secondElementNewSize / containerSize) * 100;
+
+                 // Apply flex-basis percentages
+                 mouseDownInfo.firstElement.style.flexBasis = `${firstBasis}%`;
+                 mouseDownInfo.secondElement.style.flexBasis = `${secondBasis}%`;
+
+                 // Refresh CodeMirror instances if they exist in the resized panes
+                 refreshEditorInPane(mouseDownInfo.firstElement);
+                 refreshEditorInPane(mouseDownInfo.secondElement);
+            }
+
+            function handleMouseUp() {
+                document.body.classList.remove('dragging'); // Remove dragging class
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                mouseDownInfo = null; // Clear drag info
+            }
+
+            function refreshEditorInPane(paneElement) {
+                 if (paneElement.contains(htmlEditor?.getWrapperElement())) htmlEditor.refresh();
+                 if (paneElement.contains(cssEditor?.getWrapperElement())) cssEditor.refresh();
+                 if (paneElement.contains(jsEditor?.getWrapperElement())) jsEditor.refresh();
+            }
+        }
+
+
+        // --- Initialize Everything on Load ---
+        window.addEventListener('load', () => {
+            initializeEditors();
+
+            // Initialize Draggable Splitters
+            makeDraggable('h-splitter', {
+                first: document.getElementById('editor-row'),
+                second: document.getElementById('preview-row')
+            }, 'horizontal');
+
+            makeDraggable('v-splitter-1', {
+                first: document.getElementById('html-pane'),
+                second: document.getElementById('css-pane')
+            }, 'vertical');
+
+            makeDraggable('v-splitter-2', {
+                first: document.getElementById('css-pane'),
+                second: document.getElementById('js-pane')
+            }, 'vertical');
+        });
 
     </script>
 
