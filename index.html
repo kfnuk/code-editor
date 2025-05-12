@@ -3,111 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Code Editor with Draggable Splitters</title>
+    <title>Live Code Editor - Prettier Formatting (Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/material-darker.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/dialog/dialog.min.css">
 
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='50' height='100' fill='%231a202c'/%3E%3C!-- Dark Gray Left --%3E%3Crect x='50' width='50' height='100' fill='%23ffffff'/%3E%3C!-- White Right --%3E%3Ctext x='50' y='65' font-size='50' font-family='monospace' fill='%23a0aec0' text-anchor='middle'%3E%26lt;/%26gt;%3C/text%3E%3C!-- Light Gray Code Brackets --%3E%3C/svg%3E" type="image/svg+xml">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='50' height='100' fill='%231a202c'/%3E%3Crect x='50' width='50' height='100' fill='%23ffffff'/%3E%3Ctext x='50' y='65' font-size='50' font-family='monospace' fill='%23a0aec0' text-anchor='middle'%3E%26lt;/%26gt;%3C/text%3E%3C/svg%3E" type="image/svg+xml">
 
     <style>
-        /* Prevent text selection during drag */
-        body.dragging, body.dragging * {
-            cursor: grabbing !important; /* Indicate dragging */
-            user-select: none; /* Prevent text selection */
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-        }
+        body.dragging, body.dragging * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }
+        /* Darker Splitter Styles */
+        .splitter-horizontal { height: 6px; background-color: #2d3748; cursor: ns-resize; flex-shrink: 0; z-index: 10; position: relative; border-top: 1px solid #4a5568; border-bottom: 1px solid #4a5568; }
+        .splitter-vertical { width: 6px; background-color: #2d3748; cursor: ew-resize; flex-shrink: 0; z-index: 10; position: relative; border-left: 1px solid #4a5568; border-right: 1px solid #4a5568; }
+        .splitter-horizontal:hover, .splitter-vertical:hover { background-color: #4a5568; }
 
-        /* Splitter Styles */
-        .splitter-horizontal {
-            height: 6px; /* Make it easier to grab */
-            background-color: #4a5568; /* gray-700 */
-            cursor: ns-resize; /* North-South resize cursor */
-            flex-shrink: 0; /* Prevent splitter from shrinking */
-            z-index: 10; /* Ensure it's above panes */
-            position: relative;
-        }
-        .splitter-vertical {
-            width: 6px; /* Make it easier to grab */
-            background-color: #4a5568; /* gray-700 */
-            cursor: ew-resize; /* East-West resize cursor */
-            flex-shrink: 0; /* Prevent splitter from shrinking */
-            z-index: 10;
-            position: relative;
-        }
-        .splitter-horizontal:hover, .splitter-vertical:hover {
-             background-color: #718096; /* gray-500 */
-        }
+        .CodeMirror { font-size: 14px; line-height: 1.4; flex-grow: 1; position: relative; min-height: 50px; z-index: 1; height: 100%; }
+        .editor-codemirror-container { display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; position: relative; min-height: 0; }
+        .preview-pane iframe { height: 100%; width: 100%; border: none; }
+        .editor-pane { display: flex; flex-direction: column; overflow: hidden; position: relative; min-width: 50px; min-height: 70px; background-color: #1a202c; /* gray-900 */ }
+        .editor-pane label, .editor-pane .toolbar-container { flex-shrink: 0; }
+        .preview-pane { min-height: 50px; background-color: #ffffff; }
 
-
-        /* CodeMirror Styles */
-        .CodeMirror {
-            font-size: 14px;
-            line-height: 1.4;
-            flex-grow: 1;
-            position: relative;
-            min-height: 50px; /* Minimum height for editor */
-            z-index: 1;
-            height: 100%; /* Crucial for CodeMirror to fill container */
-        }
-        .editor-codemirror-container {
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1;
-            overflow: hidden;
-            position: relative;
-            min-height: 0; /* Allow shrinking */
-        }
-
-        /* Iframe Styles */
-        .preview-pane iframe {
-             height: 100%;
-             width: 100%;
-             border: none;
-        }
-
-        /* Pane Styles */
-        .editor-pane {
-            display: flex;
-            flex-direction: column;
-            /* height: 100%; REMOVED - Flex basis will control */
-            overflow: hidden;
-            position: relative; /* Needed for absolute positioning if required later */
-            min-width: 50px; /* Minimum width for editor panes */
-            min-height: 70px; /* Minimum height for editor panes (label+toolbar+min editor) */
-        }
-        .editor-pane label, .editor-pane .toolbar {
-            flex-shrink: 0;
-        }
-        .preview-pane {
-             min-height: 50px; /* Minimum height for preview */
-        }
-
-        /* Toolbar Styles */
-        .toolbar {
-            display: flex;
-            flex-wrap: wrap;
-        }
-        .toolbar button {
-            padding: 4px 8px; margin: 2px; border-radius: 4px;
+        /* Dark Toolbar Styles */
+        .toolbar-container { background-color: #2d3748; padding: 4px 2px; border-bottom: 1px solid #4a5568; }
+        .toolbar { display: flex; flex-wrap: wrap; align-items: center; }
+        .toolbar-group { display: flex; align-items: center; margin: 2px 4px; padding: 0 4px; border-right: 1px solid #4a5568; }
+        .toolbar-group:last-child { border-right: none; }
+        .toolbar button, .toolbar select {
+            padding: 4px; margin: 1px 2px; border-radius: 4px;
             background-color: #4a5568; color: #e2e8f0; border: 1px solid #718096;
-            font-size: 12px; cursor: pointer; transition: background-color 0.2s;
-            line-height: 1;
+            font-size: 13px; cursor: pointer; transition: background-color 0.2s;
+            line-height: 1; min-width: 28px; text-align: center;
         }
-        .toolbar button:hover { background-color: #718096; }
-        .toolbar button:active { background-color: #2d3748; }
-        .toolbar button i { font-style: normal; }
+        .toolbar select { font-size: 12px; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23e2e8f0' viewBox='0 0 20 20'%3E%3Cpath d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; padding-right: 1.8rem; }
+        .toolbar button:hover, .toolbar select:hover { background-color: #718096; }
+        .toolbar button:active { background-color: #1a202c; }
+        .toolbar button svg { display: inline-block; width: 1em; height: 1em; vertical-align: middle; fill: currentColor; }
 
-        /* Preview Iframe Container */
-        .preview-iframe-container {
-            flex-grow: 1;
-            overflow: hidden;
-            min-height: 0; /* Allow shrinking */
-        }
+        /* Source code mode */
+        .editor-pane.source-mode .toolbar-container { display: none; }
+        .editor-pane.source-mode .editor-codemirror-container { flex-grow: 1; }
 
+        .preview-iframe-container { flex-grow: 1; overflow: hidden; min-height: 0; }
     </style>
 </head>
 <body class="bg-gray-100 font-sans flex flex-col h-screen overflow-hidden">
@@ -117,64 +56,102 @@
     </header>
 
     <div id="main-container" class="flex-grow flex flex-col overflow-hidden">
-
-        <div id="editor-row" class="flex flex-row bg-gray-800 overflow-hidden" style="flex-basis: 50%;"> <div id="html-pane" class="editor-pane flex-1 border-r border-gray-700 min-w-0" style="flex-basis: 33.33%;">
-                <label class="bg-gray-700 p-2 font-medium text-sm text-gray-200">HTML</label>
-                <div class="toolbar bg-gray-600 p-1 border-b border-gray-700">
-                    <button id="btn-bold" title="Bold (Ctrl+B)"><b>B</b></button>
-                    <button id="btn-italic" title="Italic (Ctrl+I)"><i>I</i></button>
-                    <button id="btn-underline" title="Underline (Ctrl+U)"><u>U</u></button>
-                    <button id="btn-strikethrough" title="Strikethrough"><s>S</s></button>
-                    <button id="btn-h1" title="Heading 1">H1</button>
-                    <button id="btn-h2" title="Heading 2">H2</button>
-                    <button id="btn-h3" title="Heading 3">H3</button>
-                    <button id="btn-p" title="Paragraph">P</button>
-                    <button id="btn-blockquote" title="Blockquote">"</button>
-                    <button id="btn-ol" title="Ordered List">1.</button>
-                    <button id="btn-ul" title="Unordered List">•</button>
-                    <button id="btn-link" title="Insert Link">Link</button>
-                    <button id="btn-image" title="Insert Image">Img</button>
-                    <button id="btn-code" title="Inline Code">`Code`</button>
-                    <button id="btn-pre" title="Preformatted Text">[Pre]</button>
-                    <button id="btn-hr" title="Horizontal Rule">---</button>
+        <div id="editor-row" class="flex flex-row overflow-hidden" style="flex-basis: 50%;">
+            <div id="html-pane" class="editor-pane flex-1 border-r border-gray-700 min-w-0" style="flex-basis: 33.33%;">
+                <label class="bg-gray-700 p-2 font-medium text-sm text-gray-200 flex justify-between items-center">
+                    <span>HTML</span>
+                    <button id="btn-toggle-source" title="Toggle Source View" class="text-xs px-2 py-0.5 bg-gray-600 hover:bg-gray-500 rounded">Source</button>
+                </label>
+                <div class="toolbar-container">
+                    <div class="toolbar">
+                        <div class="toolbar-group">
+                            <button id="btn-undo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 20 20"><path d="M10 2.5c-3.86 0-7 3.14-7 7s3.14 7 7 7 7-3.14 7-7a6.97 6.97 0 00-1.46-4.24l-1.42 1.42A4.97 4.97 0 0115 9.5c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5v2.5l4-4-4-4v2.5z"/></svg></button>
+                            <button id="btn-redo" title="Redo (Ctrl+Y)"><svg viewBox="0 0 20 20"><path d="M10 2.5v-2.5l4 4-4 4v-2.5c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5a4.97 4.97 0 00-1.46-3.54l1.42-1.42A6.97 6.97 0 0117 9.5c0 3.86-3.14 7-7 7s-7-3.14-7-7 3.14-7 7-7z"/></svg></button>
+                        </div>
+                         <div class="toolbar-group">
+                            <button id="btn-clear-format" title="Clear Formatting"><svg viewBox="0 0 20 20"><path d="M14.47 14.47L16 13l-1.5-1.5-.7.7L15.3 13l-1.5 1.5.7.7zm-6.84-9.3l1.41 1.41L7.62 8H14v2H7.62l1.41 1.41L8.36 12 5 8.64l3.36-3.36.68.7zM5 17h10a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></button>
+                        </div>
+                        <div class="toolbar-group">
+                            <select id="select-font-family" title="Font Family">
+                                <option value="" disabled selected>Font</option>
+                                <option value="Arial, sans-serif">Arial</option> <option value="'Helvetica Neue', Helvetica, sans-serif">Helvetica Neue</option> <option value="'Times New Roman', Times, serif">Times New Roman</option> <option value="Georgia, serif">Georgia</option> <option value="'Courier New', Courier, monospace">Courier New</option> <option value="'Lucida Console', Monaco, monospace">Lucida Console</option> <option value="Verdana, sans-serif">Verdana</option> <option value="Tahoma, sans-serif">Tahoma</option> <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option> <option value="Impact, Charcoal, sans-serif">Impact</option> <option value="'Comic Sans MS', cursive, sans-serif">Comic Sans</option>
+                            </select>
+                            <select id="select-font-size" title="Font Size">
+                                <option value="" disabled selected>Size</option>
+                                <option value="8px">8</option><option value="10px">10</option><option value="12px">12</option><option value="14px">14</option><option value="16px">16</option><option value="18px">18</option><option value="20px">20</option><option value="24px">24</option><option value="30px">30</option><option value="36px">36</option><option value="48px">48</option><option value="60px">60</option>
+                            </select>
+                            <button id="btn-text-color" title="Text Color">A</button>
+                            <button id="btn-bg-color" title="Background Color">Bg</button>
+                        </div>
+                        <div class="toolbar-group">
+                            <button id="btn-bold" title="Bold (Ctrl+B)"><svg viewBox="0 0 20 20"><path d="M8.4 15c1.88 0 3.14-1.01 3.14-2.56 0-1.05-.6-1.8-1.68-2.17l1.45-2.4H9.24L8.1 11.1h-.86v3.9zm-.86-1.17v-1.56h.86c.63 0 1.01.4 1.01.96 0 .6-.4.97-1.01.97zM15 4H5a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2z"/></svg></button>
+                            <button id="btn-italic" title="Italic (Ctrl+I)"><svg viewBox="0 0 20 20"><path d="M12.2 4H8.5l-.8 3h2.9l-.8 4H6.9l-.8 3h3.7l.8-3H8.7l.8-4h2.9l.8-3zM15 4H5a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2z"/></svg></button>
+                            <button id="btn-underline" title="Underline (Ctrl+U)"><svg viewBox="0 0 20 20"><path d="M10 12.1c1.9 0 3.3-1.4 3.3-3.3V4h-1.4v4.8c0 1.1-.8 1.9-1.9 1.9s-1.9-.8-1.9-1.9V4H6.7v4.8c0 1.9 1.4 3.3 3.3 3.3zm-5 2.4v1h10v-1zm10-11H5a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2z"/></svg></button>
+                            <button id="btn-strikethrough" title="Strikethrough"><svg viewBox="0 0 20 20"><path d="M15.5 9H4.5a.5.5 0 000 1h11a.5.5 0 000-1zM15 4H5a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2z"/></svg></button>
+                            <button id="btn-superscript" title="Superscript"><svg viewBox="0 0 20 20"><path d="M15.4 5.5h-2.9l-1 2.5h-1l3.4-8h1.4l3.4 8h-1l-1-2.5zm-1.4-1l-.8 2h1.6l-.8-2zM6 15.5c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3zm0-1c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg></button>
+                            <button id="btn-subscript" title="Subscript"><svg viewBox="0 0 20 20"><path d="M6 11.5c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3zm0-1c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm9.4 7h-2.9l-1-2.5h-1l3.4-8h1.4l3.4 8h-1l-1-2.5zm-1.4-1l-.8 2h1.6l-.8-2z"/></svg></button>
+                        </div>
+                        <div class="toolbar-group">
+                            <button id="btn-h1" title="Heading 1">H1</button> <button id="btn-h2" title="Heading 2">H2</button> <button id="btn-h3" title="Heading 3">H3</button>
+                            <button id="btn-p" title="Paragraph">P</button> <button id="btn-blockquote" title="Blockquote"><svg viewBox="0 0 20 20"><path d="M7 6a1 1 0 011-1h8a1 1 0 011 1v8a1 1 0 01-1 1h-2a1 1 0 01-1-1v-2H9v2a1 1 0 01-1 1H6a1 1 0 01-1-1V7a1 1 0 011-1zm1 1v6h1V7zm6 0v6h1V7zM3 6a1 1 0 011-1h1v8H4a1 1 0 01-1-1z"/></svg></button>
+                        </div>
+                        <div class="toolbar-group">
+                            <button id="btn-align-left" title="Align Left"><svg viewBox="0 0 20 20"><path d="M3 4h14v2H3zm0 4h10v2H3zm0 4h14v2H3zm0 4h10v2H3z"/></svg></button>
+                            <button id="btn-align-center" title="Align Center"><svg viewBox="0 0 20 20"><path d="M3 4h14v2H3zm3 4h8v2H6zm-3 4h14v2H3zm3 4h8v2H6z"/></svg></button>
+                            <button id="btn-align-right" title="Align Right"><svg viewBox="0 0 20 20"><path d="M3 4h14v2H3zm7 4h7v2h-7zm-7 4h14v2H3zm7 4h7v2h-7z"/></svg></button>
+                            <button id="btn-align-justify" title="Align Justify"><svg viewBox="0 0 20 20"><path d="M3 4h14v2H3zm0 4h14v2H3zm0 4h14v2H3zm0 4h14v2H3z"/></svg></button>
+                        </div>
+                        <div class="toolbar-group">
+                            <button id="btn-ol" title="Ordered List"><svg viewBox="0 0 20 20"><path d="M7 5h10v2H7zm0 4h10v2H7zm0 4h10v2H7zM4.5 4a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM3 9h1.5V8H3v1zm1.5 1H3v1h1v1H3v1h1.5v-1h.5V9h-.5v1zM4.5 14h-3v1h1.5v.5h-1v1h3v-1H3v-.5h1.5z"/></svg></button>
+                            <button id="btn-ul" title="Unordered List"><svg viewBox="0 0 20 20"><path d="M7 5h10v2H7zm0 4h10v2H7zm0 4h10v2H7zM4 6a1 1 0 11-2 0 1 1 0 012 0zm0 4a1 1 0 11-2 0 1 1 0 012 0zm0 4a1 1 0 11-2 0 1 1 0 012 0z"/></svg></button>
+                            <button id="btn-indent" title="Indent"><svg viewBox="0 0 20 20"><path d="M3 4h14v2H3zm0 4h14v2H3zm0 4h14v2H3zm0 4h14v2H3zm8-13l4 3.5-4 3.5V9H8V7h3z"/></svg></button>
+                            <button id="btn-outdent" title="Outdent"><svg viewBox="0 0 20 20"><path d="M3 4h14v2H3zm0 4h14v2H3zm0 4h14v2H3zm0 4h14v2H3zm4-13l-4 3.5 4 3.5V9h3V7H7z"/></svg></button>
+                        </div>
+                        <div class="toolbar-group">
+                            <button id="btn-link" title="Insert Link"><svg viewBox="0 0 20 20"><path d="M12.24 7.76a.75.75 0 00-1.06-1.06l-2.5 2.5a.75.75 0 000 1.06l2.5 2.5a.75.75 0 101.06-1.06L10.81 10l1.43-1.44zm-4.48 4.48a.75.75 0 101.06 1.06l2.5-2.5a.75.75 0 000-1.06l-2.5-2.5a.75.75 0 00-1.06 1.06L9.19 10l-1.43 1.44zM10 3a7 7 0 100 14 7 7 0 000-14z"/></svg></button>
+                            <button id="btn-image" title="Insert Image"><svg viewBox="0 0 20 20"><path d="M3 4a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.5l-2 2.5-2-2.5H5a2 2 0 01-2-2zm10 4a1 1 0 100-2 1 1 0 000 2zm-6 2l2 2.5L13 8l2 4H5z"/></svg></button>
+                            <button id="btn-hr" title="Horizontal Rule">---</button>
+                            <button id="btn-chars" title="Special Characters">©</button>
+                        </div>
+                        <div class="toolbar-group">
+                             <button id="btn-code" title="Inline Code"><svg viewBox="0 0 20 20"><path d="M7.7 14.7a.75.75 0 001.06 0l4.5-4.5a.75.75 0 000-1.06l-4.5-4.5a.75.75 0 00-1.06 1.06L11.69 10l-3.99 3.94a.75.75 0 000 1.06zm-3.4 0a.75.75 0 001.06 0l4.5-4.5a.75.75 0 000-1.06l-4.5-4.5a.75.75 0 00-1.06 1.06L8.29 10l-3.99 3.94a.75.75 0 000 1.06z"/></svg></button>
+                             <button id="btn-pre" title="Preformatted Text">[Pre]</button>
+                        </div>
+                         <div class="toolbar-group">
+                            <button id="btn-find" title="Find/Replace (Ctrl+F)"><svg viewBox="0 0 20 20"><path d="M12.9 14.32a8 8 0 111.41-1.41l4.39 4.38a1 1 0 01-1.42 1.42zM8 14A6 6 0 108 2a6 6 0 000 12z"/></svg></button>
+                            <button id="btn-table" title="Insert Table"><svg viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H3a1 1 0 01-1-1zm2 2v4h4V5zm0 5v4h4v-4zm5-5v4h4V5zm0 5v4h4v-4zm5-5v4h4V5zm0 5v4h4v-4z"/></svg></button>
+                            <button id="btn-prettier" title="Format HTML Code">Format</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="editor-codemirror-container">
-                    <textarea id="html-code"><div class="p-4">
-  <h1 class="text-2xl font-bold text-blue-400">Hello World!</h1>
-  <p class="mt-2 text-gray-300">Edit the code to see live updates below.</p>
-  <button id="myButton" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">Click Me</button>
-  <p id="message" class="mt-2 text-sm text-green-400"></p>
-</div></textarea>
+                    <textarea id="html-code"></textarea>
                 </div>
             </div>
 
             <div id="v-splitter-1" class="splitter-vertical"></div>
-
             <div id="css-pane" class="editor-pane flex-1 border-r border-gray-700 min-w-0" style="flex-basis: 33.33%;">
                 <label class="bg-gray-700 p-2 font-medium text-sm text-gray-200">CSS</label>
                  <div class="editor-codemirror-container">
-                    <textarea id="css-code">/* Default CSS */ body { font-family: sans-serif; margin: 0; padding: 10px; background-color: #ffffff; color: #333333; } #myButton { transition: background-color 0.3s ease; } h1 { color: #2563eb; }</textarea>
+                    <textarea id="css-code"></textarea>
                 </div>
             </div>
-
             <div id="v-splitter-2" class="splitter-vertical"></div>
-
             <div id="js-pane" class="editor-pane flex-1 min-w-0" style="flex-basis: 33.33%;">
                 <label class="bg-gray-700 p-2 font-medium text-sm text-gray-200">JavaScript</label>
                  <div class="editor-codemirror-container">
-                    <textarea id="js-code">// Default JS\nconst btn = document.getElementById('myButton');\nconst msg = document.getElementById('message');\nif(btn&&msg){btn.onclick=()=>{msg.textContent='Clicked: '+new Date().toLocaleTimeString();setTimeout(()=>msg.textContent='',3000)}}else{console.error('Btn/Msg not found')}</textarea>
+                    <textarea id="js-code"></textarea>
                 </div>
             </div>
         </div>
 
         <div id="h-splitter" class="splitter-horizontal"></div>
-
-        <div id="preview-row" class="flex flex-col preview-pane bg-white" style="flex-basis: 50%;"> <label class="bg-gray-200 p-2 font-medium text-sm text-gray-700 border-b border-gray-300 flex-shrink-0">Preview</label>
+        <div id="preview-row" class="flex flex-col preview-pane bg-white" style="flex-basis: 50%;">
+             <label class="bg-gray-200 p-2 font-medium text-sm text-gray-700 border-b border-gray-300 flex-shrink-0">Preview</label>
              <div class="preview-iframe-container">
                 <iframe id="preview-pane" title="Live Preview"></iframe>
              </div>
         </div>
-
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
@@ -183,78 +160,203 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closetag.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/selection/active-line.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/dialog/dialog.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/search/searchcursor.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/search/search.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/search/jump-to-line.min.js"></script>
 
-
-    <script>
+    <script src="https://unpkg.com/prettier@2.8.8/standalone.js"></script>
+    <script src="https://unpkg.com/prettier@2.8.8/parser-html.js"></script>
+    <script src="https://unpkg.com/prettier@2.8.8/parser-babel.js"></script> <script src="https://unpkg.com/prettier@2.8.8/parser-postcss.js"></script> <script>
         let htmlEditor, cssEditor, jsEditor;
         const previewPane = document.getElementById('preview-pane');
         let debounceTimer;
+        const localStorageKeys = {
+            html: 'codeEditorHtmlContent_v3', // Incremented version
+            css: 'codeEditorCssContent_v3',
+            js: 'codeEditorJsContent_v3',
+            hSplit: 'codeEditorHSplit_v3',
+            vSplit1: 'codeEditorVSplit1_v3',
+        };
 
-        // --- Toolbar Functions (remain the same) ---
-        function wrapOrInsertTag(tag, isBlock = false, attributes = '') { /* ... as before ... */
+        const defaultHtml = `<div class="p-4">\n  <h1 class="text-2xl font-bold text-blue-600">Hello World!</h1>\n  <p class="mt-2 text-gray-700">Edit the code to see live updates below.</p>\n  <button id="myButton" class="mt-4 px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600">Click Me</button>\n  <p id="message" class="mt-2 text-sm text-green-600"></p>\n</div>`;
+        const defaultCss = `/* Default CSS */\nbody {\n  font-family: sans-serif;\n  margin: 0;\n  padding: 10px;\n  background-color: #ffffff;\n  color: #333333;\n}\n#myButton {\n  transition: background-color 0.3s ease;\n}\nh1 {\n  color: #2563eb;\n}`;
+        const defaultJs = `// Default JavaScript\nconst button = document.getElementById('myButton');\nconst message = document.getElementById('message');\n\nif (button && message) {\n  button.addEventListener('click', () => {\n    message.textContent = 'Button clicked at ' + new Date().toLocaleTimeString();\n    setTimeout(() => {\n      message.textContent = '';\n    }, 3000);\n  });\n} else {\n  console.error("Error: Button or message element not found.");\n}`;
+
+        // --- HTML Toolbar Functions ---
+        function applyStyleSpan(styleProperty, styleValue) {
+            if (!htmlEditor || !styleValue) return;
+            const selection = htmlEditor.getSelection(); const cursor = htmlEditor.getCursor();
+            let styleAttribute = `${styleProperty.replace(/([A-Z])/g, "-$1").toLowerCase()}: ${styleValue};`;
+            if (selection) { htmlEditor.replaceSelection(`<span style="${styleAttribute}">${selection}</span>`);
+            } else {
+                htmlEditor.replaceRange(`<span style="${styleAttribute}">&nbsp;</span>`, cursor);
+                htmlEditor.setCursor({ line: cursor.line, ch: cursor.ch + `<span style="${styleAttribute}">`.length });
+            }
+            htmlEditor.focus(); updatePreview();
+        }
+        function wrapOrInsertTag(tag, isBlock = false, attributes = '', contentIfNoSelection = '') {
             if (!htmlEditor) return;
-            const selection = htmlEditor.getSelection();
-            const cursor = htmlEditor.getCursor();
-            const line = htmlEditor.getLine(cursor.line);
-            let openTag = `<${tag}${attributes ? ' ' + attributes : ''}>`;
-            let closeTag = `</${tag}>`;
-            if (selection) { htmlEditor.replaceSelection(`${openTag}${selection}${closeTag}`); }
-            else if (isBlock && line.trim() !== '') { htmlEditor.setLine(cursor.line, `${openTag}${line}${closeTag}`); }
-            else { htmlEditor.replaceRange(`${openTag}${closeTag}`, cursor); htmlEditor.setCursor({ line: cursor.line, ch: cursor.ch + openTag.length }); }
+            const selection = htmlEditor.getSelection(); const cursor = htmlEditor.getCursor(); const line = htmlEditor.getLine(cursor.line);
+            let openTag = `<${tag}${attributes ? ' ' + attributes : ''}>`; let closeTag = `</${tag}>`; let finalContent = selection || contentIfNoSelection;
+            if (selection) { htmlEditor.replaceSelection(`${openTag}${finalContent}${closeTag}`);
+            } else if (isBlock && line.trim() !== '') { htmlEditor.setLine(cursor.line, `${openTag}${line}${closeTag}`);
+            } else {
+                htmlEditor.replaceRange(`${openTag}${finalContent}${closeTag}`, cursor);
+                if (!finalContent) { htmlEditor.setCursor({ line: cursor.line, ch: cursor.ch + openTag.length }); }
+            }
             htmlEditor.focus(); updatePreview();
         }
         function applyInlineTag(tag) { wrapOrInsertTag(tag, false); }
         function applyBlockTag(tag) { wrapOrInsertTag(tag, true); }
-        function insertList(listType) { /* ... as before ... */
-            if (!htmlEditor) return; const sel = htmlEditor.listSelections()[0]; const start = sel.anchor.line; const end = sel.head.line; let content = '';
-            for (let i = Math.min(start, end); i <= Math.max(start, end); i++) { const line = htmlEditor.getLine(i).trim(); if (line || i === start) { content += `\n  <li>${line}</li>`; } }
-            if (content) { const tag = `<${listType}>${content}\n</${listType}>\n`; if (start !== end || htmlEditor.getLine(start).trim() !== '') { htmlEditor.replaceRange(tag, { line: Math.min(start, end), ch: 0 }, { line: Math.max(start, end), ch: htmlEditor.getLine(Math.max(start, end)).length }); } else { htmlEditor.replaceRange(tag, htmlEditor.getCursor()); } }
-            else { const cursor = htmlEditor.getCursor(); htmlEditor.replaceRange(`<${listType}>\n  <li></li>\n</${listType}>\n`, cursor); htmlEditor.setCursor({ line: cursor.line + 1, ch: 4 }); }
+        function applyAlignment(alignment) {
+             if (!htmlEditor) return; const selection = htmlEditor.getSelection(); const cursor = htmlEditor.getCursor(); const currentLine = htmlEditor.getLine(cursor.line);
+            if (selection) { htmlEditor.replaceSelection(`<div style="text-align: ${alignment};">${selection}</div>`);
+            } else if (currentLine.trim() !== '') { htmlEditor.setLine(cursor.line, `<div style="text-align: ${alignment};">${currentLine.trim()}</div>`);
+            } else { wrapOrInsertTag('div', true, `style="text-align: ${alignment};"`, '&nbsp;'); }
             htmlEditor.focus(); updatePreview();
-         }
-        function insertLink() { /* ... as before ... */ if (!htmlEditor) return; const url = prompt("Enter link URL:", "https://"); if (url) { wrapOrInsertTag('a', false, `href="${url}"`); } }
-        function insertImage() { /* ... as before ... */ if (!htmlEditor) return; const src = prompt("Enter image URL:", "https://"); if (src) { const alt = prompt("Alt text:", ""); const tag = `<img src="${src}" alt="${alt || 'Image'}" style="max-width: 100%; height: auto;">\n`; htmlEditor.replaceRange(tag, htmlEditor.getCursor()); htmlEditor.focus(); updatePreview(); } }
-        function insertHorizontalRule() { /* ... as before ... */ if (!htmlEditor) return; htmlEditor.replaceRange('<hr>\n', htmlEditor.getCursor()); htmlEditor.focus(); updatePreview(); }
+        }
+        function changeListIndentation(command) { if (!htmlEditor) return; htmlEditor.execCommand(command); htmlEditor.focus(); updatePreview(); }
+        function insertList(listType) {
+            if (!htmlEditor) return; const sel = htmlEditor.listSelections()[0]; const start = sel.anchor.line; const end = sel.head.line; let content = '';
+            for (let i = Math.min(start, end); i <= Math.max(start, end); i++) { const line = htmlEditor.getLine(i).trim(); if (line || i === start) { content += `\n  <li>${line || '&nbsp;'}</li>`; } }
+            if (content) { const tag = `<${listType}>${content}\n</${listType}>\n`; if (start !== end || htmlEditor.getLine(start).trim() !== '') { htmlEditor.replaceRange(tag, { line: Math.min(start, end), ch: 0 }, { line: Math.max(start, end), ch: htmlEditor.getLine(Math.max(start, end)).length }); } else { htmlEditor.replaceRange(tag, htmlEditor.getCursor()); } }
+            else { const cursor = htmlEditor.getCursor(); htmlEditor.replaceRange(`<${listType}>\n  <li>&nbsp;</li>\n</${listType}>\n`, cursor); htmlEditor.setCursor({ line: cursor.line + 1, ch: 4 }); }
+            htmlEditor.focus(); updatePreview();
+        }
+        function insertLink() { if (!htmlEditor) return; const url = prompt("Enter link URL:", "https://"); if (url) { wrapOrInsertTag('a', false, `href="${url}"`); } }
+        function insertImage() { if (!htmlEditor) return; const src = prompt("Enter image URL:", "https://placehold.co/300x200/eeeeee/cccccc?text=My+Image"); if (src) { const alt = prompt("Alt text:", "My Image"); const tag = `<img src="${src}" alt="${alt || 'Image'}" style="max-width: 100%; height: auto;">\n`; htmlEditor.replaceRange(tag, htmlEditor.getCursor()); htmlEditor.focus(); updatePreview(); } }
+        function insertHorizontalRule() { if (!htmlEditor) return; htmlEditor.replaceRange('<hr>\n', htmlEditor.getCursor()); htmlEditor.focus(); updatePreview(); }
+        function insertTablePlaceholder() {
+             if (!htmlEditor) return;
+             const rows = parseInt(prompt("Enter number of rows:", "2"), 10) || 2;
+             const cols = parseInt(prompt("Enter number of columns:", "2"), 10) || 2;
+             let tableHtml = '<table border="1" style="width:100%; border-collapse: collapse;">\n';
+             for (let r = 0; r < rows; r++) { tableHtml += '  <tr>\n'; for (let c = 0; c < cols; c++) { tableHtml += `    <td>Cell ${r+1}-${c+1}</td>\n`; } tableHtml += '  </tr>\n'; }
+             tableHtml += '</table>\n';
+             htmlEditor.replaceRange(tableHtml, htmlEditor.getCursor()); htmlEditor.focus(); updatePreview();
+        }
+        function clearFormatting() {
+            if (!htmlEditor) return; const selection = htmlEditor.getSelection(); if (!selection) return;
+            let cleanedText = selection.replace(/<span\b[^>]*>/gi, '').replace(/<\/span>/gi, '')
+                                       .replace(/<[/]?(strong|b|em|i|u|del|s|sup|sub|code)\b[^>]*>/gi, '');
+            cleanedText = cleanedText.replace(/(<[a-z][^>]*)\s+style="[^"]*"/gi, '$1');
+            htmlEditor.replaceSelection(cleanedText); htmlEditor.focus(); updatePreview();
+        }
+        function insertSpecialChar(charEntity) { if (!htmlEditor || !charEntity) return; htmlEditor.replaceRange(charEntity, htmlEditor.getCursor()); htmlEditor.focus(); updatePreview(); }
+        function toggleSourceMode() {
+            const htmlPane = document.getElementById('html-pane');
+            const isSourceMode = htmlPane.classList.toggle('source-mode');
+            document.getElementById('btn-toggle-source').textContent = isSourceMode ? 'WYSIWYG' : 'Source';
+            setTimeout(() => htmlEditor?.refresh(), 50);
+        }
+        // UPDATED: Format HTML with Prettier
+        function formatHtmlWithPrettier() {
+            if (!htmlEditor || typeof prettier === 'undefined' || typeof prettierPlugins === 'undefined') {
+                alert("Prettier library not loaded correctly.");
+                return;
+            }
+            try {
+                const currentCode = htmlEditor.getValue();
+                const formattedCode = prettier.format(currentCode, {
+                    parser: "html",
+                    plugins: prettierPlugins, // This global is expected by Prettier standalone
+                    printWidth: 100, // Adjust as desired
+                    htmlWhitespaceSensitivity: "css", // Common setting
+                });
+                htmlEditor.setValue(formattedCode);
+                updatePreview(); // Update preview after formatting
+            } catch (error) {
+                console.error("Error formatting HTML with Prettier:", error);
+                alert("Error formatting HTML: " + error.message);
+            }
+        }
+
 
         // --- Editor Initialization ---
         function initializeEditors() {
-             const commonConfig = { /* ... as before ... */
+             const commonConfig = {
                 lineNumbers: true, theme: "material-darker", lineWrapping: true, autoCloseTags: true, styleActiveLine: true,
-                extraKeys: { "Ctrl-B": (cm)=>applyInlineTag('strong'), "Cmd-B": (cm)=>applyInlineTag('strong'), "Ctrl-I": (cm)=>applyInlineTag('em'), "Cmd-I": (cm)=>applyInlineTag('em'), "Ctrl-U": (cm)=>applyInlineTag('u'), "Cmd-U": (cm)=>applyInlineTag('u') }
+                extraKeys: {
+                    "Ctrl-B": (cm)=>applyInlineTag('strong'), "Cmd-B": (cm)=>applyInlineTag('strong'),
+                    "Ctrl-I": (cm)=>applyInlineTag('em'), "Cmd-I": (cm)=>applyInlineTag('em'),
+                    "Ctrl-U": (cm)=>applyInlineTag('u'), "Cmd-U": (cm)=>applyInlineTag('u'),
+                    "Tab": "indentMore", "Shift-Tab": "indentLess",
+                    "Ctrl-F": "findPersistent", "Cmd-F": "findPersistent",
+                    "Ctrl-Z": (cm) => cm.undo(), "Cmd-Z": (cm) => cm.undo(),
+                    "Ctrl-Y": (cm) => cm.redo(), "Cmd-Y": (cm) => cm.redo(), "Shift-Ctrl-Z": (cm) => cm.redo(), "Shift-Cmd-Z": (cm) => cm.redo()
+                 }
              };
              try {
-                const htmlTA = document.getElementById('html-code'); htmlEditor = CodeMirror.fromTextArea(htmlTA, {...commonConfig, mode: 'xml', htmlMode: true}); htmlTA.style.display = 'none';
-                const cssTA = document.getElementById('css-code'); cssEditor = CodeMirror.fromTextArea(cssTA, {...commonConfig, mode: 'css'}); cssTA.style.display = 'none';
-                const jsTA = document.getElementById('js-code'); jsEditor = CodeMirror.fromTextArea(jsTA, {...commonConfig, mode: 'javascript'}); jsTA.style.display = 'none';
+                const initialHtml = localStorage.getItem(localStorageKeys.html) || defaultHtml;
+                const initialCss = localStorage.getItem(localStorageKeys.css) || defaultCss;
+                const initialJs = localStorage.getItem(localStorageKeys.js) || defaultJs;
+
+                const htmlTA = document.getElementById('html-code'); htmlTA.value = initialHtml;
+                htmlEditor = CodeMirror.fromTextArea(htmlTA, {...commonConfig, mode: 'xml', htmlMode: true}); htmlTA.style.display = 'none';
+
+                const cssTA = document.getElementById('css-code'); cssTA.value = initialCss;
+                cssEditor = CodeMirror.fromTextArea(cssTA, {...commonConfig, mode: 'css'}); cssTA.style.display = 'none';
+
+                const jsTA = document.getElementById('js-code'); jsTA.value = initialJs;
+                jsEditor = CodeMirror.fromTextArea(jsTA, {...commonConfig, mode: 'javascript'}); jsTA.style.display = 'none';
 
                 // Attach Toolbar Listeners
-                document.getElementById('btn-bold').onclick = () => applyInlineTag('strong'); document.getElementById('btn-italic').onclick = () => applyInlineTag('em');
-                document.getElementById('btn-underline').onclick = () => applyInlineTag('u'); document.getElementById('btn-strikethrough').onclick = () => applyInlineTag('del');
-                document.getElementById('btn-h1').onclick = () => applyBlockTag('h1'); document.getElementById('btn-h2').onclick = () => applyBlockTag('h2'); document.getElementById('btn-h3').onclick = () => applyBlockTag('h3');
-                document.getElementById('btn-p').onclick = () => applyBlockTag('p'); document.getElementById('btn-blockquote').onclick = () => applyBlockTag('blockquote');
-                document.getElementById('btn-ol').onclick = () => insertList('ol'); document.getElementById('btn-ul').onclick = () => insertList('ul');
-                document.getElementById('btn-link').onclick = insertLink; document.getElementById('btn-image').onclick = insertImage;
-                document.getElementById('btn-code').onclick = () => applyInlineTag('code'); document.getElementById('btn-pre').onclick = () => applyBlockTag('pre'); document.getElementById('btn-hr').onclick = insertHorizontalRule;
+                document.getElementById('btn-undo').onclick = () => htmlEditor.undo();
+                document.getElementById('btn-redo').onclick = () => htmlEditor.redo();
+                document.getElementById('btn-clear-format').onclick = clearFormatting;
+                document.getElementById('select-font-family').onchange = (e) => { if(e.target.value) applyStyleSpan('font-family', e.target.value); e.target.selectedIndex = 0; };
+                document.getElementById('select-font-size').onchange = (e) => { if(e.target.value) applyStyleSpan('font-size', e.target.value); e.target.selectedIndex = 0; };
+                document.getElementById('btn-text-color').onclick = () => { const color = prompt("Enter text color (e.g., #ff0000 or red):", "#000000"); if(color) applyStyleSpan('color', color); };
+                document.getElementById('btn-bg-color').onclick = () => { const color = prompt("Enter background color (e.g., #ffff00 or yellow):", "#ffffff"); if(color) applyStyleSpan('background-color', color); };
+                document.getElementById('btn-bold').onclick = () => applyInlineTag('strong');
+                document.getElementById('btn-italic').onclick = () => applyInlineTag('em');
+                document.getElementById('btn-underline').onclick = () => applyInlineTag('u');
+                document.getElementById('btn-strikethrough').onclick = () => applyInlineTag('del');
+                document.getElementById('btn-superscript').onclick = () => applyInlineTag('sup');
+                document.getElementById('btn-subscript').onclick = () => applyInlineTag('sub');
+                document.getElementById('btn-h1').onclick = () => applyBlockTag('h1');
+                document.getElementById('btn-h2').onclick = () => applyBlockTag('h2');
+                document.getElementById('btn-h3').onclick = () => applyBlockTag('h3');
+                document.getElementById('btn-p').onclick = () => applyBlockTag('p');
+                document.getElementById('btn-blockquote').onclick = () => applyBlockTag('blockquote');
+                document.getElementById('btn-align-left').onclick = () => applyAlignment('left');
+                document.getElementById('btn-align-center').onclick = () => applyAlignment('center');
+                document.getElementById('btn-align-right').onclick = () => applyAlignment('right');
+                document.getElementById('btn-align-justify').onclick = () => applyAlignment('justify');
+                document.getElementById('btn-ol').onclick = () => insertList('ol');
+                document.getElementById('btn-ul').onclick = () => insertList('ul');
+                document.getElementById('btn-indent').onclick = () => changeListIndentation('indentMore');
+                document.getElementById('btn-outdent').onclick = () => changeListIndentation('indentLess');
+                document.getElementById('btn-link').onclick = insertLink;
+                document.getElementById('btn-image').onclick = insertImage;
+                document.getElementById('btn-hr').onclick = insertHorizontalRule;
+                document.getElementById('btn-chars').onclick = () => { const char = prompt("Insert character entity (e.g., &copy;, &reg;, &nbsp;):", "&copy;"); if (char) insertSpecialChar(char); };
+                document.getElementById('btn-code').onclick = () => applyInlineTag('code');
+                document.getElementById('btn-pre').onclick = () => applyBlockTag('pre');
+                document.getElementById('btn-find').onclick = () => htmlEditor.execCommand("findPersistent");
+                document.getElementById('btn-table').onclick = insertTablePlaceholder;
+                document.getElementById('btn-prettier').onclick = formatHtmlWithPrettier; // UPDATED
+                document.getElementById('btn-toggle-source').onclick = toggleSourceMode;
 
-                // Attach change listeners
-                htmlEditor.on('change', debouncedUpdate); cssEditor.on('change', debouncedUpdate); jsEditor.on('change', debouncedUpdate);
+                // Auto-save listeners
+                htmlEditor.on('change', (cm) => { localStorage.setItem(localStorageKeys.html, cm.getValue()); debouncedUpdate(); });
+                cssEditor.on('change', (cm) => { localStorage.setItem(localStorageKeys.css, cm.getValue()); debouncedUpdate(); });
+                jsEditor.on('change', (cm) => { localStorage.setItem(localStorageKeys.js, cm.getValue()); debouncedUpdate(); });
 
                 // Initial Refresh & Update
                  setTimeout(() => { try { htmlEditor.refresh(); cssEditor.refresh(); jsEditor.refresh(); updatePreview(); } catch(e){ console.error("Refresh Error:", e); } }, 300);
 
-             } catch (e) { console.error("Init Error:", e); alert("Editor init failed!"); /* Show fallbacks */ }
+             } catch (e) { console.error("Init Error:", e); alert("Editor init failed!"); }
         }
 
-        // --- Debounced Preview Update ---
         function debouncedUpdate() { clearTimeout(debounceTimer); debounceTimer = setTimeout(updatePreview, 300); }
-
-        // --- Update Preview Function ---
-        function updatePreview() { /* ... largely the same as before ... */
-            if (!htmlEditor || !cssEditor || !jsEditor) { return; } let previewDoc;
+        function updatePreview() {
+             if (!htmlEditor || !cssEditor || !jsEditor) { return; } let previewDoc;
             try {
                 previewDoc = previewPane.contentWindow.document; if (!previewDoc) { console.error("Preview doc missing"); return; }
                 const html = htmlEditor.getValue(); const css = cssEditor.getValue(); const js = jsEditor.getValue();
-                const fullHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"><\/script><style>html, body { height: 100%; margin: 0; padding: 0; overflow: auto; } ${css} .preview-error { background-color: #fff0f0; color: #c53030; border: 1px solid #f56565; padding: 10px; margin: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; font-size: 0.9em; position: relative; z-index: 9999; } blockquote { border-left: 4px solid #ccc; margin-left: 0; padding-left: 1rem; color: #555; } pre { background-color: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; } code { font-family: monospace; background-color: #eee; padding: 2px 4px; border-radius: 3px; } pre code { background-color: transparent; padding: 0; border-radius: 0; }<\/style><title>Preview</title></head><body class="bg-white">${html}<script>const err = document.querySelector('.preview-error'); if(err) err.remove(); try { (function() { ${js} })(); } catch (e) { console.error("JS Error:", e); throw e; }<\/script></body></html>`;
+                const fullHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"><\/script><style>html, body { height: 100%; margin: 0; padding: 0; overflow: auto; } ${css} .preview-error { background-color: #fff0f0; color: #c53030; border: 1px solid #f56565; padding: 10px; margin: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; font-size: 0.9em; position: relative; z-index: 9999; } blockquote { border-left: 4px solid #ccc; margin-left: 0; padding-left: 1rem; color: #555; } pre { background-color: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; } code { font-family: monospace; background-color: #eee; padding: 2px 4px; border-radius: 3px; } pre code { background-color: transparent; padding: 0; border-radius: 0; } sup, sub { line-height: 0; } table { border-collapse: collapse; width: 100%; margin-bottom: 1rem;} td, th { border: 1px solid #ddd; padding: 8px; text-align: left;} th { background-color: #f2f2f2;} <\/style><title>Preview</title></head><body class="bg-white">${html}<script>const err = document.querySelector('.preview-error'); if(err) err.remove(); try { (function() { ${js} })(); } catch (e) { console.error("JS Error:", e); throw e; }<\/script></body></html>`;
                 previewDoc.open(); previewDoc.write(fullHtml); previewDoc.close();
             } catch (e) {
                 console.error("Preview Update Error:", e);
@@ -263,103 +365,73 @@
         }
 
         // --- Splitter Logic ---
-        function makeDraggable(splitterId, affectedElements, direction) {
-            const splitter = document.getElementById(splitterId);
-            if (!splitter) return;
-
-            let mouseDownInfo;
-
+        function makeDraggable(splitterId, affectedElements, direction, storageKey) {
+            const splitter = document.getElementById(splitterId); if (!splitter) return; let mouseDownInfo;
             splitter.addEventListener('mousedown', (e) => {
-                mouseDownInfo = {
-                    e,
-                    offsetLeft: splitter.offsetLeft,
-                    offsetTop: splitter.offsetTop,
-                    firstElement: affectedElements.first,
-                    secondElement: affectedElements.second,
-                    firstElementInitialSize: (direction === 'horizontal') ? affectedElements.first.offsetHeight : affectedElements.first.offsetWidth,
-                    secondElementInitialSize: (direction === 'horizontal') ? affectedElements.second.offsetHeight : affectedElements.second.offsetWidth
-                };
-                document.body.classList.add('dragging'); // Add class for cursor and selection prevention
-                document.addEventListener('mousemove', handleMouseMove);
-                document.addEventListener('mouseup', handleMouseUp);
+                mouseDownInfo = { e, firstElement: affectedElements.first, secondElement: affectedElements.second,
+                    firstInitialSize: (direction === 'horizontal') ? affectedElements.first.offsetHeight : affectedElements.first.offsetWidth,
+                    secondInitialSize: (direction === 'horizontal') ? affectedElements.second.offsetHeight : affectedElements.second.offsetWidth };
+                document.body.classList.add('dragging'); document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
             });
-
             function handleMouseMove(e) {
                 if (!mouseDownInfo) return;
-
                 const container = (direction === 'horizontal') ? document.getElementById('main-container') : document.getElementById('editor-row');
                 const containerSize = (direction === 'horizontal') ? container.offsetHeight : container.offsetWidth;
                 const splitterSize = (direction === 'horizontal') ? splitter.offsetHeight : splitter.offsetWidth;
-
-                // Calculate delta
                 let delta = (direction === 'horizontal') ? e.clientY - mouseDownInfo.e.clientY : e.clientX - mouseDownInfo.e.clientX;
-
-                // Calculate new sizes in pixels
-                let firstElementNewSize = mouseDownInfo.firstElementInitialSize + delta;
-                let secondElementNewSize = mouseDownInfo.secondElementInitialSize - delta;
-
-                // Enforce minimum sizes (e.g., 50px)
+                let firstNewSize = mouseDownInfo.firstInitialSize + delta; let secondNewSize = mouseDownInfo.secondInitialSize - delta;
                 const minSize = 50;
-                if (firstElementNewSize < minSize) {
-                    firstElementNewSize = minSize;
-                    secondElementNewSize = containerSize - minSize - splitterSize;
-                    delta = firstElementNewSize - mouseDownInfo.firstElementInitialSize; // Recalculate delta based on constraint
-                } else if (secondElementNewSize < minSize) {
-                    secondElementNewSize = minSize;
-                    firstElementNewSize = containerSize - minSize - splitterSize;
-                    delta = firstElementNewSize - mouseDownInfo.firstElementInitialSize; // Recalculate delta based on constraint
+                if (firstNewSize < minSize) { secondNewSize -= (minSize - firstNewSize); firstNewSize = minSize; }
+                if (secondNewSize < minSize) { firstNewSize -= (minSize - secondNewSize); secondNewSize = minSize; }
+                if (firstNewSize + secondNewSize > containerSize - splitterSize) { if (delta > 0) secondNewSize = containerSize - splitterSize - firstNewSize; else firstNewSize = containerSize - splitterSize - secondNewSize; }
+
+                if (firstNewSize >= minSize && secondNewSize >= minSize) {
+                    const firstBasis = (firstNewSize / containerSize) * 100;
+                    const secondBasis = (secondNewSize / containerSize) * 100;
+                    mouseDownInfo.firstElement.style.flexBasis = `${firstBasis}%`;
+                    mouseDownInfo.secondElement.style.flexBasis = `${secondBasis}%`;
+                    if (storageKey) { localStorage.setItem(storageKey, JSON.stringify({ first: firstBasis, second: secondBasis })); }
+                    refreshEditorInPane(mouseDownInfo.firstElement); refreshEditorInPane(mouseDownInfo.secondElement);
                 }
-
-
-                 // Convert pixel sizes to percentages for flex-basis
-                 const firstBasis = (firstElementNewSize / containerSize) * 100;
-                 const secondBasis = (secondElementNewSize / containerSize) * 100;
-
-                 // Apply flex-basis percentages
-                 mouseDownInfo.firstElement.style.flexBasis = `${firstBasis}%`;
-                 mouseDownInfo.secondElement.style.flexBasis = `${secondBasis}%`;
-
-                 // Refresh CodeMirror instances if they exist in the resized panes
-                 refreshEditorInPane(mouseDownInfo.firstElement);
-                 refreshEditorInPane(mouseDownInfo.secondElement);
             }
+            function handleMouseUp() { document.body.classList.remove('dragging'); document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp); mouseDownInfo = null; }
+            function refreshEditorInPane(pane) {
+                 if (pane.contains(htmlEditor?.getWrapperElement()) && !pane.classList.contains('source-mode')) htmlEditor.refresh();
+                 if (pane.contains(cssEditor?.getWrapperElement())) cssEditor.refresh();
+                 if (pane.contains(jsEditor?.getWrapperElement())) jsEditor.refresh();
+             }
+        }
 
-            function handleMouseUp() {
-                document.body.classList.remove('dragging'); // Remove dragging class
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-                mouseDownInfo = null; // Clear drag info
-            }
-
-            function refreshEditorInPane(paneElement) {
-                 if (paneElement.contains(htmlEditor?.getWrapperElement())) htmlEditor.refresh();
-                 if (paneElement.contains(cssEditor?.getWrapperElement())) cssEditor.refresh();
-                 if (paneElement.contains(jsEditor?.getWrapperElement())) jsEditor.refresh();
+        function loadSplitterPositions() {
+            try {
+                const hSplitPos = JSON.parse(localStorage.getItem(localStorageKeys.hSplit));
+                if (hSplitPos && hSplitPos.first && hSplitPos.second) {
+                    document.getElementById('editor-row').style.flexBasis = `${hSplitPos.first}%`;
+                    document.getElementById('preview-row').style.flexBasis = `${hSplitPos.second}%`;
+                }
+                 const vSplit1Pos = JSON.parse(localStorage.getItem(localStorageKeys.vSplit1));
+                 if (vSplit1Pos && vSplit1Pos.first && vSplit1Pos.second) {
+                    document.getElementById('html-pane').style.flexBasis = `${vSplit1Pos.first}%`;
+                    document.getElementById('css-pane').style.flexBasis = `${vSplit1Pos.second}%`;
+                    document.getElementById('js-pane').style.flexBasis = null; // Let flex calculate
+                 }
+            } catch(e) {
+                console.error("Error loading splitter positions:", e);
+                document.getElementById('editor-row').style.flexBasis = '50%';
+                document.getElementById('preview-row').style.flexBasis = '50%';
+                document.getElementById('html-pane').style.flexBasis = '33.33%';
+                document.getElementById('css-pane').style.flexBasis = '33.33%';
+                document.getElementById('js-pane').style.flexBasis = '33.33%';
             }
         }
 
-
-        // --- Initialize Everything on Load ---
         window.addEventListener('load', () => {
+            loadSplitterPositions();
             initializeEditors();
-
-            // Initialize Draggable Splitters
-            makeDraggable('h-splitter', {
-                first: document.getElementById('editor-row'),
-                second: document.getElementById('preview-row')
-            }, 'horizontal');
-
-            makeDraggable('v-splitter-1', {
-                first: document.getElementById('html-pane'),
-                second: document.getElementById('css-pane')
-            }, 'vertical');
-
-            makeDraggable('v-splitter-2', {
-                first: document.getElementById('css-pane'),
-                second: document.getElementById('js-pane')
-            }, 'vertical');
+            makeDraggable('h-splitter', { first: document.getElementById('editor-row'), second: document.getElementById('preview-row') }, 'horizontal', localStorageKeys.hSplit);
+            makeDraggable('v-splitter-1', { first: document.getElementById('html-pane'), second: document.getElementById('css-pane') }, 'vertical', localStorageKeys.vSplit1);
+            makeDraggable('v-splitter-2', { first: document.getElementById('css-pane'), second: document.getElementById('js-pane') }, 'vertical', null);
         });
-
     </script>
 
 </body>
